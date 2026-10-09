@@ -34,10 +34,11 @@ Total ₹20,000 of ₹20,000. Three malformed events are skipped and listed (no 
 ### Assumptions
 These are assumptions, not facts from the data. If one is wrong, the output can change.
 
-1. **Every SKU has the same margin %.** The brief gives only unit cost, not selling price or margin. Under this
-   assumption the profit lost per unit short is proportional to unit cost, so every rupee spent on a reorder protects
-   the same profit whichever SKU it goes to. The budget rule below depends on this. If margins differ, rank SKUs by
-   profit protected per rupee instead (see the allocation table).
+1. **Assumption: the margin % is the same for every SKU.** The brief gives only unit cost, not selling price or
+   margin, so this is an assumption I made, not something in the data. It implies that profit lost per unit short is
+   proportional to unit cost, so every rupee spent on a reorder protects the same profit whichever SKU it goes to.
+   The budget rule below rests on this. If margins differ, SKUs should instead be ranked by profit protected per
+   rupee (see the strategy table).
 2. **"Today" is the latest valid event timestamp** (2026-08-26 in the sample), so results are reproducible. Override
    with `--as-of`.
 3. **Stock is pooled across channels** for each SKU. The catalog's primary channel is shown for context only.
@@ -58,14 +59,25 @@ out before an order placed today could arrive.
   for about 15.6 of those days, so its real rate is about 16.65/day and 192 units last only about 11.5 days. A
   calendar-day average would have wrongly marked it safe.
 - **Reorder quantity** is `ceil(daily_demand × 14 − current_stock)`: the least that avoids a stockout until the order
-  arrives. It matches the brief's example (SKU-101: 60 units, ₹12,000). It carries no safety stock; `--cover-days`
-  raises the target (for SKU-101, 21 days is 130 units / ₹26,000).
+  arrives. It matches the brief's example (SKU-101: 60 units, ₹12,000).
+
+Order-quantity alternatives, from most to least preferred (SKU-101: 80 on hand, 10/day). `--cover-days` switches
+between the first three.
+
+| # | Target | SKU-101 order | Pros | Cons |
+|---|---|---|---|---|
+| 1 | **Lead-time cover (chosen):** `demand × 14 − stock` | 60 units / ₹12,000 | Matches the brief's example; smallest order; fits the budget best | No cushion: a demand spike causes a stockout, and next week's order is urgent again |
+| 2 | Lead time + 3-day buffer (17 days) | 90 units / ₹18,000 | Small cushion for modest extra cost | The buffer size is arbitrary and needs ops input |
+| 3 | Lead time + 7-day review cycle (21 days) | 130 units / ₹26,000 | Lasts until the next weekly order can arrive | About twice the cost; SKU-101 alone (₹26,000) exceeds the ₹20,000 budget |
+| 4 | Statistical safety stock (z·σ·√lead time) | Needs the variance of daily sales | The textbook method | Too little data and near-constant demand, so extra complexity for no benefit |
 
 ### How the budget is split when it doesn't cover everyone
+**Assumption: the margin % is the same for every SKU** (assumption 1), so profit protected per rupee is equal across SKUs.
+
 The three at-risk SKUs need ₹26,360 in total, against a ₹20,000 budget. The rule, in priority order:
 
-1. **Profit.** Under assumption 1, profit protected per rupee is the same for every SKU, so profit is maximised by
-   spending as much of the budget as possible, never more than a SKU needs.
+1. **Profit.** Because of the equal-margin assumption, profit protected per rupee is the same for every SKU, so
+   profit is maximised by spending as much of the budget as possible, never more than a SKU needs.
 2. **Ops effort.** Among plans that spend the same, use the fewest purchase orders: take SKUs by largest order value
    until the budget is covered, and buy one SKU as fully as possible before starting the next.
 3. **Urgency.** Within those SKUs, fund the soonest stockout first, in full. The last one gets what remains, rounded
@@ -74,14 +86,16 @@ The three at-risk SKUs need ₹26,360 in total, against a ₹20,000 budget. The 
 Result on the sample data: SKU-104 in full (22 units, ₹11,000) and SKU-101 partly (45 of 60 units, ₹9,000). SKU-103 is
 still flagged at risk but deferred.
 
-| Alternative | Pros | Cons |
-|---|---|---|
-| **Chosen: spend the most, fewest POs, then urgency** | Uses the whole budget, 2 POs, easy to explain | Depends on equal margins and partial orders; leaves SKU-103 about 2.5 days short |
-| Urgency order, whole orders only | Realistic order sizes | Skips SKU-101, the largest, and leaves ₹5,640 idle |
-| Knapsack on whole orders | Best spend with whole orders only | Picks SKU-101 + SKU-103 and skips SKU-104, the soonest stockout; hard to explain |
-| Proportional scale-down | Looks fair | Every SKU still stocks out |
-| Stockout-days avoided per rupee | Covers the most SKUs (103 and 104 in full, 101 gets 28 units) | Leaves the highest-volume SKU short |
-| Weight by margin or price | Right answer when margins differ | Needs selling price per SKU, which we don't have |
+Alternatives, from most to least preferred:
+
+| # | Strategy | Pros | Cons |
+|---|---|---|---|
+| 1 | **Chosen: spend the most, fewest POs, then urgency** | Uses the whole budget with 2 POs; easy to explain | Depends on equal margins and partial orders; leaves SKU-103 about 2.5 days short |
+| 2 | Weight by margin or price | The right answer when margins differ (would become #1 once we have them) | Needs selling price per SKU, which we don't have |
+| 3 | Stockout-days avoided per rupee | Covers the most SKUs (103 and 104 in full, 101 gets 28 units) | Leaves the highest-volume SKU short |
+| 4 | Knapsack on whole orders | Best spend if partial orders are not allowed (SKU-101 + SKU-103, ₹15,360) | Skips SKU-104, the soonest stockout; hard to explain |
+| 5 | Urgency order, whole orders only | Realistic order sizes | Skips SKU-101, the largest, and leaves ₹5,640 idle |
+| 6 | Proportional scale-down | Looks fair | Every SKU still stocks out |
 
 ### Time complexity
 With `n` events and `k` SKUs (4 here): sorting events by time is O(n log n), replaying them is O(n), and ranking
