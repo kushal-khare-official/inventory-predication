@@ -86,16 +86,23 @@ The three at-risk SKUs need ₹26,360 in total, against a ₹20,000 budget. The 
 Result on the sample data: SKU-104 in full (22 units, ₹11,000) and SKU-101 partly (45 of 60 units, ₹9,000). SKU-103 is
 still flagged at risk but deferred.
 
-Alternatives, from most to least preferred:
+Alternatives, from most to least preferred. Each row shows what the strategy does to the ₹20,000 budget and what
+the unfunded part of the orders costs us in lost sales:
 
-| # | Strategy | Pros | Cons |
-|---|---|---|---|
-| 1 | **Chosen: spend the most, fewest POs, then urgency** | Uses the whole budget with 2 POs; easy to explain | Depends on equal margins and partial orders; leaves SKU-103 about 2.5 days short |
-| 2 | Weight by margin or price | The right answer when margins differ (would become #1 once we have them) | Needs selling price per SKU, which we don't have |
-| 3 | Stockout-days avoided per rupee | Covers the most SKUs (103 and 104 in full, 101 gets 28 units) | Leaves the highest-volume SKU short |
-| 4 | Knapsack on whole orders | Best spend if partial orders are not allowed (SKU-101 + SKU-103, ₹15,360) | Skips SKU-104, the soonest stockout; hard to explain |
-| 5 | Urgency order, whole orders only | Realistic order sizes | Skips SKU-101, the largest, and leaves ₹5,640 idle |
-| 6 | Proportional scale-down | Looks fair | Every SKU still stocks out |
+| # | Strategy | Spent / unspent | Stockout loss | Pros | Cons |
+|---|---|---|---|---|---|
+| 1 | **Chosen: spend the most, fewest POs, then urgency** | ₹20,000 / ₹0 | **₹6,360**: SKU-101 15 units (₹3,000) + SKU-103 42 units (₹3,360) | Uses the whole budget with 2 POs; easy to explain | Depends on equal margins and partial orders; leaves SKU-103 about 2.5 days short |
+| 2 | Weight by margin or price | Not computable | Not computable | The right answer when margins differ (would become #1 once we have them) | Needs selling price per SKU, which we don't have |
+| 3 | Stockout-days avoided per rupee | ₹19,960 / ₹40 | ₹6,400: SKU-101 32 units | Covers the most SKUs (103 and 104 in full, 101 gets 28 units) | Leaves the highest-volume SKU short |
+| 4 | Knapsack on whole orders | ₹15,360 / ₹4,640 | ₹11,000: SKU-104 22 units | Best spend if partial orders are not allowed (SKU-101 + SKU-103) | Skips SKU-104, the soonest stockout; hard to explain |
+| 5 | Urgency order, whole orders only | ₹14,360 / ₹5,640 | ₹12,000: SKU-101 60 units | Realistic order sizes | Skips SKU-101, the largest, and leaves ₹5,640 idle |
+| 6 | Proportional scale-down (about 76% of each need) | ₹19,480 / ₹520 | ₹6,880: SKU-104 6 + SKU-101 15 + SKU-103 11 units | Looks fair | Every SKU still stocks out |
+
+How the stockout loss is calculated: an order that arrives on day 14 can only cover demand until then. Units not
+ordered are demand we can't serve between the stockout and delivery (for SKU-101: 10 units/day × 6 days = 60 units).
+So `loss = (units needed − units ordered) × unit cost`, using the same order quantities as above (SKU-101 60,
+SKU-104 22, SKU-103 42). It is valued **at cost** because selling price isn't given, so it understates lost revenue.
+It covers this order cycle only.
 
 ### Time complexity
 With `n` events and `k` SKUs (4 here): sorting events by time is O(n log n), replaying them is O(n), and ranking
