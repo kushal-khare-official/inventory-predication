@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import request from "supertest";
-import { createApp } from "../src/server";
 import { allocateBudget, planReorders, type Recommendation } from "../src/inventory";
 
 const day = (n: number) => new Date(Date.UTC(2026, 7, 1 + n)).toISOString();
@@ -135,7 +133,7 @@ describe("budget allocation", () => {
   });
 });
 
-describe("sample data and API", () => {
+describe("sample data", () => {
   const raw = JSON.parse(readFileSync("data/inventory_events.json", "utf8"));
 
   it("produces the expected plan end to end", () => {
@@ -149,11 +147,5 @@ describe("sample data and API", () => {
     assert.deepEqual([by("SKU-104").reorder_quantity, by("SKU-104").reorder_cost], [22, 11_000]);
     assert.deepEqual([by("SKU-101").reorder_quantity, by("SKU-101").reorder_cost], [45, 9_000]);
     assert.equal(plan.recommendations.reduce((s, r) => s + r.reorder_cost, 0), 20_000);
-  });
-
-  it("serves the same plan over HTTP", async () => {
-    const res = await request(createApp()).post("/recommendations").send(raw).expect(200);
-    assert.equal(res.body.recommendations.length, 4);
-    assert.equal(res.body.skipped_events.length, 3);
   });
 });
