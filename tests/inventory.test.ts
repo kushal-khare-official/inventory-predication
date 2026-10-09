@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { allocateBudget, planReorders, type Recommendation } from "../src/inventory";
+import { allocateReorderBudget, buildReorderPlan, type ReorderRecommendation } from "../main";
 
 const day = (n: number) => new Date(Date.UTC(2026, 7, 1 + n)).toISOString();
 const ev = (sku: string, type: string, quantity: unknown, timestamp: unknown) => ({
@@ -20,11 +20,11 @@ function steady(sku: string, perDay: number, stock: number) {
   return events;
 }
 
-const find = (recs: Recommendation[], sku: string) => recs.find((r) => r.sku === sku)!;
+const find = (recs: ReorderRecommendation[], sku: string) => recs.find((r) => r.sku === sku)!;
 
 describe("required cases", () => {
   it("does not flag a SKU with plenty of stock for its sales rate", () => {
-    const { recommendations } = planReorders(steady("SKU-102", 2, 500));
+    const { recommendations } = buildReorderPlan(steady("SKU-102", 2, 500));
     const r = find(recommendations, "SKU-102");
     assert.equal(r.at_risk, false);
     assert.equal(r.recommend_reorder, false);
@@ -32,7 +32,7 @@ describe("required cases", () => {
   });
 
   it("flags a SKU with low stock and steady sales (the brief's example)", () => {
-    const { recommendations } = planReorders(steady("SKU-101", 10, 80));
+    const { recommendations } = buildReorderPlan(steady("SKU-101", 10, 80));
     const r = find(recommendations, "SKU-101");
     assert.equal(r.at_risk, true);
     assert.equal(r.daily_demand, 10);
@@ -53,15 +53,15 @@ describe("required cases", () => {
       null,
       "garbage",
     ];
-    const plan = planReorders([...steady("SKU-101", 10, 80), ...bad]);
-    assert.equal(plan.skipped.length, bad.length);
+    const plan = buildReorderPlan([...steady("SKU-101", 10, 80), ...bad]);
+    assert.equal(plan.rejectedEvents.length, bad.length);
     const r = find(plan.recommendations, "SKU-101");
     assert.equal(r.reorder_quantity, 60); // bad rows had no effect
   });
 
   it("does not crash when the input is not an array or is empty", () => {
-    assert.equal(planReorders({ nope: true }).skipped.length, 1);
-    const plan = planReorders([]);
+    assert.equal(buildReorderPlan({ nope: true }).rejectedEvents.length, 1);
+    const plan = buildReorderPlan([]);
     assert.ok(plan.recommendations.every((r) => !r.at_risk));
   });
 });
@@ -76,7 +76,7 @@ describe("less clear-cut situations", () => {
       ev("SKU-103", "restock", 200, day(20)),
       ev("SKU-103", "stock_snapshot", 200, day(30)),
     ];
-    const r = find(planReorders(events).recommendations, "SKU-103");
+    const r = find(buildReorderPlan(events).recommendations, "SKU-103");
     assert.equal(r.daily_demand, 6.67); // 100 units over 15 in-stock days
     assert.equal(r.at_risk, false); // 200 / 6.67 = 30 days
     const naive = 100 / 30;
@@ -90,12 +90,12 @@ describe("less clear-cut situations", () => {
       ev("SKU-101", "return", 5, day(32)),
       ev("SKU-101", "restock", 50, day(33)),
     ];
-    const r = find(planReorders(events).recommendations, "SKU-101");
+    const r = find(buildReorderPlan(events).recommendations, "SKU-101");
     assert.equal(r.current_stock, 155);
   });
 
   it("treats a SKU with no sales as not at risk", () => {
-    const r = find(planReorders([ev("SKU-102", "stock_snapshot", 5, day(0))]).recommendations, "SKU-102");
+    const r = find(buildReorderPlan([ev("SKU-102", "stock_snapshot", 5, day(0))]).recommendations, "SKU-102");
     assert.equal(r.at_risk, false);
     assert.equal(r.days_of_stock_remaining, null);
   });
@@ -104,17 +104,17 @@ describe("less clear-cut situations", () => {
 describe("budget allocation", () => {
   const analysis = (sku: "SKU-101" | "SKU-103" | "SKU-104", unitCost: number, days: number, qty: number) => ({
     sku,
-    channel: "x",
-    unitCost,
-    currentStock: 0,
-    dailyDemand: 1,
-    daysOfStockRemaining: days,
-    atRisk: true,
-    neededQuantity: qty,
+    primaryChannel: "x",
+    unitCostInRupees: unitCost,
+    unitsOnHand: 0,
+    averageDailyDemand: 1,
+    daysOfStockLeft: days,
+    isAtRisk: true,
+    unitsNeeded: qty,
   });
 
   it("funds the soonest stockout in full and partially fills the last SKU", () => {
-    const recs = allocateBudget(
+    const recs = allocateReorderBudget(
       [analysis("SKU-101", 200, 8, 60), analysis("SKU-104", 500, 6.67, 22), analysis("SKU-103", 80, 11.5, 42)],
       20_000,
     );
@@ -128,7 +128,7 @@ describe("budget allocation", () => {
   });
 
   it("funds everything in full when the budget is enough", () => {
-    const recs = allocateBudget([analysis("SKU-101", 200, 8, 60), analysis("SKU-103", 80, 11.5, 42)], 100_000);
+    const recs = allocateReorderBudget([analysis("SKU-101", 200, 8, 60), analysis("SKU-103", 80, 11.5, 42)], 100_000);
     assert.ok(recs.every((r) => r.reorder_quantity > 0 && !r.partial));
   });
 });
@@ -137,8 +137,8 @@ describe("sample data", () => {
   const raw = JSON.parse(readFileSync("data/inventory_events.json", "utf8"));
 
   it("produces the expected plan end to end", () => {
-    const plan = planReorders(raw);
-    assert.equal(plan.skipped.length, 3);
+    const plan = buildReorderPlan(raw);
+    assert.equal(plan.rejectedEvents.length, 3);
     const by = (sku: string) => find(plan.recommendations, sku);
     assert.equal(by("SKU-102").at_risk, false);
     assert.ok(["SKU-101", "SKU-103", "SKU-104"].every((s) => by(s).at_risk));

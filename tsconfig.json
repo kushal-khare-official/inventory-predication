@@ -10,5 +10,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["main.ts", "src", "tests"]
+  "include": ["main.ts", "tests"]
 }

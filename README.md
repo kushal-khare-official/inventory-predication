@@ -119,8 +119,7 @@ Follow-ups:
 ## Layout
 
 ```
-main.ts                  entry point: reads the file, prints table/JSON
-src/inventory.ts         parsing/validation, per-SKU reducer, risk analysis, budget allocation
+main.ts                  everything: validation, stock/demand replay, risk analysis, budget allocation, CLI
 tests/inventory.test.ts  node:test suite
 data/inventory_events.json
 ```
@@ -128,7 +127,7 @@ data/inventory_events.json
 ## Scaling to production (1M+ events/day)
 Not built here; this is how the same core would grow:
 
-- Ingest through a queue (BullMQ, SQS or Kafka) partitioned by SKU so per-SKU ordering holds. `applyEvent` is already
+- Ingest through a queue (BullMQ, SQS or Kafka) partitioned by SKU so per-SKU ordering holds. `applyEventToState` is already
   an incremental reducer, so a worker can fold events one at a time with no locking.
 - Persist per-SKU reducer state in MongoDB (one document per SKU, upserted), with an event id as idempotency key for
   at-least-once delivery. A late or out-of-order event would trigger a replay of that SKU.
