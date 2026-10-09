@@ -9,8 +9,8 @@ TypeScript, Node 20+.
 
 ```bash
 npm install
-npm start                                  # table view of data/inventory_events.json
-npx tsx main.ts data/inventory_events.json --format json   # machine-readable
+npm start                                  # table view of inventory_events.json
+npx tsx main.ts inventory_events.json --format json   # machine-readable
 npm test                                   # unit + end-to-end tests
 npm run typecheck
 ```
@@ -18,7 +18,7 @@ npm run typecheck
 Options: `--budget N`, `--lead-time N`, `--cover-days N` (days of demand a reorder should cover, default = lead time),
 `--as-of ISO_DATE`.
 
-### Sample output (`data/inventory_events.json`)
+### Sample output (`inventory_events.json`)
 
 | SKU | At risk | Stock | Units/day | Days left | Order | Cost |
 |---|---|---|---|---|---|---|
@@ -120,8 +120,8 @@ Follow-ups:
 
 ```
 main.ts                  everything: validation, stock/demand replay, risk analysis, budget allocation, CLI
-tests/inventory.test.ts  node:test suite
-data/inventory_events.json
+inventory.test.ts        node:test suite
+inventory_events.json    sample event log
 ```
 
 ## Scaling to production (1M+ events/day)

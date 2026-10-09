@@ -10,5 +10,5 @@
     "types": ["node"],
     "noEmit": true
   },
-  "include": ["main.ts", "tests"]
+  "include": ["main.ts", "inventory.test.ts"]
 }

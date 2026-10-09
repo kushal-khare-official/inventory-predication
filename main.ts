@@ -19,7 +19,7 @@
  *
  * RUN IT
  * ------
- *   npx tsx main.ts data/inventory_events.json [--format table|json] [--budget N] [--lead-time N]
+ *   npx tsx main.ts inventory_events.json [--format table|json] [--budget N] [--lead-time N]
  *                                              [--cover-days N] [--as-of ISO_DATE]
  */
 

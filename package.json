@@ -5,8 +5,8 @@
   "private": true,
   "main": "main.ts",
   "scripts": {
-    "start": "tsx main.ts data/inventory_events.json",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "start": "tsx main.ts inventory_events.json",
+    "test": "node --import tsx --test *.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
-import { allocateReorderBudget, buildReorderPlan, type ReorderRecommendation } from "../main";
+import { allocateReorderBudget, buildReorderPlan, type ReorderRecommendation } from "./main";
 
 const day = (n: number) => new Date(Date.UTC(2026, 7, 1 + n)).toISOString();
 const ev = (sku: string, type: string, quantity: unknown, timestamp: unknown) => ({
@@ -134,7 +134,7 @@ describe("budget allocation", () => {
 });
 
 describe("sample data", () => {
-  const raw = JSON.parse(readFileSync("data/inventory_events.json", "utf8"));
+  const raw = JSON.parse(readFileSync("inventory_events.json", "utf8"));
 
   it("produces the expected plan end to end", () => {
     const plan = buildReorderPlan(raw);
